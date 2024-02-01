@@ -9,46 +9,58 @@ import DamageGauge from "./damage/DamageGauge";
 import { HazardType } from "./depths/hazards/HazardType";
 import { HazardData } from "./depths/hazards/Hazard";
 
-const initialSpaces: Map<string, SpaceData> = new Map(
-  [...Array(15)].map((value, index) => {
-    const id: string = crypto.randomUUID();
+import leveldata from "../levels/leveldata.json";
+
+const initialSpaces: Map<number, SpaceData> = new Map(
+  leveldata.levels[1].spaces.map((value) => {
     return [
-      id,
+      value.spaceNumber,
       {
-        id: id,
-        name: index === 14 ? "Ocean Floor" : undefined,
-        current: index === 0 ? true : false,
-        visited: index === 0 ? true : false,
-        hazards: [{ type: HazardType.GainDamage, cost: 1, used: false }],
+        spaceNumber: value.spaceNumber,
+        name: value.name ? value.name : undefined,
+        visited: value.spaceNumber === 1 ? true : false,
+        linksToSpaces: value.linksToSpaceNumbers,
       },
     ];
   })
 );
 
-const initialHazards: Map<string, HazardData[]> = new Map(
-  Array.from(initialSpaces.values()).map((space: SpaceData) => [
-    space.id,
-    [{ type: HazardType.GainDamage, cost: 1, used: false }],
+const initialHazards: Map<number, HazardData[]> = new Map(
+  leveldata.levels[1].spaces.map((space) => [
+    space.spaceNumber,
+    space.hazards.map((hazard) => ({
+      type: HazardType.GainDamage,
+      cost: hazard.cost,
+      used: false,
+    })),
   ])
 );
 
 const Game: React.FC = (): ReactElement => {
-  const [currentSpace, setCurrentSpace] = useState<number>(0);
-  const [availableDice, setAvailableDice] = useState<number>(5);
-  const [maxOxygen, setMaxOxygen] = useState<number>(13);
+  const [currentSpace, setCurrentSpace] = useState<number>(1);
+  const [availableDice] = useState<number>(5);
+  const [maxOxygen] = useState<number>(13);
   const [oxygenUsed, setOxygenUsed] = useState<number>(0);
-  const [maxStress, setMaxStress] = useState<number>(22);
+  const [maxStress] = useState<number>(22);
   const [stressGained, setStressGained] = useState<number>(0);
-  const [maxDamage, setMaxDamage] = useState<number>(8);
+  const [maxDamage] = useState<number>(8);
   const [damageGained, setDamageGained] = useState<number>(0);
-  const [spaces, setSpaces] = useState<Map<string, SpaceData>>(initialSpaces);
-  const [hazards, setHazards] =
-    useState<Map<string, HazardData[]>>(initialHazards);
+  const [spaces] = useState<Map<number, SpaceData>>(initialSpaces);
+  const [hazards] = useState<Map<number, HazardData[]>>(initialHazards);
   const [dice, setDice] = useState<DieData[]>(rollAvailableDice(availableDice));
+  const [selectedDie, setSelectedDie] = useState<DieData | undefined>(
+    undefined
+  );
 
-  const onUseDie = (usedDie: DieData) => {
-    moveToNewSpace(usedDie);
-    markDieUsed(usedDie);
+  const onSelectDie = (usedDie: DieData) => {
+    setSelectedDie(usedDie);
+  };
+
+  const onSelectMove = (selectedMove: AvailableMove) => {
+    if (selectedDie != undefined) {
+      moveToNewSpace(selectedMove);
+      markDieUsed(selectedDie);
+    }
   };
 
   const onRerollDice = () => {
@@ -56,41 +68,42 @@ const Game: React.FC = (): ReactElement => {
     rerollDice();
   };
 
-  const moveToNewSpace = (usedDie: DieData) => {
-    const leavingSpace = currentSpace;
-    const targetSpace = currentSpace + usedDie.value;
-    setSpaces((currentSpaces) => {
-      const lastSpace = currentSpaces.size - 1;
-      const newSpaces = Array.from(currentSpaces.values()).map(
-        (space, index) => {
-          if (index < leavingSpace || index > targetSpace) {
-            return space; // not in our movement range
-          } else if (index === leavingSpace && index < lastSpace) {
-            return { ...space, current: false, visited: true }; // only unset current space if there is a next space to move to
-          } else if (
-            index > leavingSpace &&
-            index < targetSpace &&
-            index !== lastSpace
-          ) {
-            return moveThroughSpace(space);
-          } else if (index === targetSpace) {
-            setCurrentSpace(targetSpace);
-            return { ...space, current: true, visited: true };
-          } else if (index === lastSpace) {
-            setCurrentSpace(lastSpace);
-            takeStress(targetSpace - lastSpace); // difference between last space and movement
-            return { ...space, current: true, visited: true };
-          }
+  const moveToNewSpace = (selectedMove: AvailableMove) => {
+    setCurrentSpace(selectedMove.spaceNumber);
+    // setSpaces((currentSpaces) => {
+    //   const lastSpace = currentSpaces.size - 1;
+    //   const newSpaces = Array.from(currentSpaces.values()).map(
+    //     (space, index) => {
+    //       if (index < leavingSpace || index > targetSpace) {
+    //         return space; // not in our movement range
+    //       } else if (index === leavingSpace && index < lastSpace) {
+    //         return { ...space, current: false, visited: true }; // only unset current space if there is a next space to move to
+    //       } else if (
+    //         index > leavingSpace &&
+    //         index < targetSpace &&
+    //         index !== lastSpace
+    //       ) {
+    //         return moveThroughSpace(space);
+    //       } else if (index === targetSpace) {
+    //         setCurrentSpace(targetSpace);
+    //         return { ...space, current: true, visited: true };
+    //       } else if (index === lastSpace) {
+    //         setCurrentSpace(lastSpace);
+    //         takeStress(targetSpace - lastSpace); // difference between last space and movement
+    //         return { ...space, current: true, visited: true };
+    //       }
 
-          return space;
-        }
-      );
-      return new Map(newSpaces.map((newSpace) => [newSpace.id, newSpace]));
-    });
+    //       return space;
+    //     }
+    //   );
+    //   return new Map(
+    //     newSpaces.map((newSpace) => [newSpace.spaceNumber, newSpace])
+    //   );
+    // });
   };
 
   const moveThroughSpace = (space: SpaceData): SpaceData => {
-    const hazardsForSpace = hazards.get(space.id);
+    const hazardsForSpace = hazards.get(space.spaceNumber);
     if (hazardsForSpace) {
       hazardsForSpace.forEach((hazard) => {
         experienceHazard(hazard);
@@ -134,16 +147,33 @@ const Game: React.FC = (): ReactElement => {
         return die;
       })
     );
+    setSelectedDie(undefined);
   };
 
   const rerollDice = () => {
     setDice(rollAvailableDice(availableDice));
+    setSelectedDie(undefined);
   };
 
   return (
     <>
-      <Depths spaces={spaces} hazards={hazards} />
-      <DicePool dice={dice} onUseDie={onUseDie} onRerollDice={onRerollDice} />
+      <Depths
+        spaces={spaces}
+        hazards={hazards}
+        currentSpace={currentSpace}
+        availableMoves={calculateAvailableMoves(
+          currentSpace,
+          selectedDie,
+          spaces
+        )}
+        onSelectMove={onSelectMove}
+      />
+      <DicePool
+        dice={dice}
+        selectedDie={selectedDie}
+        onSelectDie={onSelectDie}
+        onRerollDice={onRerollDice}
+      />
       <OxygenGauge maxOxygen={maxOxygen} oxygenUsed={oxygenUsed} />
       <StressGauge maxStress={maxStress} stressGained={stressGained} />
       <DamageGauge maxDamage={maxDamage} damageGained={damageGained} />
@@ -160,4 +190,52 @@ const rollAvailableDice = (availableDice: number): DieData[] => {
   });
 };
 
+const calculateAvailableMoves = (
+  currentSpace: number,
+  selectedDie: DieData | undefined,
+  spaces: Map<number, SpaceData>
+): AvailableMove[] => {
+  if (selectedDie === undefined) {
+    return [];
+  }
+
+  return calculateMovesFromSpace(currentSpace, selectedDie.value, spaces, []);
+};
+
+const calculateMovesFromSpace = (
+  fromSpace: number,
+  movementRemaining: number,
+  spaces: Map<number, SpaceData>,
+  vistedSpaces: number[]
+): AvailableMove[] => {
+  if (movementRemaining === 0) {
+    return [{ spaceNumber: fromSpace }];
+  }
+
+  const consideringSpace = spaces.get(fromSpace);
+  if (consideringSpace === undefined) {
+    return [];
+  }
+
+  const availableSpaces = consideringSpace.linksToSpaces.filter(
+    (linkedSpace) => !vistedSpaces.includes(linkedSpace)
+  );
+
+  if (availableSpaces.length < 1) {
+    // TODO: add stress here to match remaining movement
+    return [{ spaceNumber: fromSpace }];
+  }
+
+  return availableSpaces.flatMap((availableSpace) =>
+    calculateMovesFromSpace(availableSpace, movementRemaining - 1, spaces, [
+      ...vistedSpaces,
+      fromSpace,
+    ])
+  );
+};
+
 export default Game;
+
+export type AvailableMove = {
+  spaceNumber: number;
+};

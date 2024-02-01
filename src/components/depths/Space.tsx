@@ -1,24 +1,40 @@
 import { ReactElement } from "react";
 import Hazard, { HazardData } from "./hazards/Hazard";
+import { AvailableMove } from "../Game";
 
 type SpaceProps = {
   space: SpaceData;
   hazards: HazardData[];
+  isCurrentSpace: boolean;
+  availableMove: AvailableMove | undefined;
+  onSelectMove: (selectedMove: AvailableMove) => void;
 };
 
-const Space: React.FC<SpaceProps> = ({ space, hazards }): ReactElement => {
-  const { name, current, visited } = space;
+const Space: React.FC<SpaceProps> = ({
+  space,
+  hazards,
+  isCurrentSpace,
+  availableMove,
+  onSelectMove,
+}): ReactElement => {
+  const { name, visited } = space;
   return (
     <div
+      onClick={() => {
+        if (availableMove) {
+          onSelectMove(availableMove);
+        }
+      }}
       style={{
         padding: "1em",
-        border: "1px solid",
-        backgroundColor: current ? "pink" : visited ? "grey" : "white",
+        border: availableMove ? "3px solid blue" : "1px solid black",
+        backgroundColor: isCurrentSpace ? "pink" : visited ? "grey" : "white",
+        cursor: availableMove ? "pointer" : "default",
       }}
     >
       <div>{name ? name : "\u00A0"}</div>
-      {hazards.map((hazard) => (
-        <Hazard data={hazard} />
+      {hazards.map((hazard, index) => (
+        <Hazard key={index} data={hazard} />
       ))}
     </div>
   );
@@ -27,8 +43,8 @@ const Space: React.FC<SpaceProps> = ({ space, hazards }): ReactElement => {
 export default Space;
 
 export type SpaceData = {
-  id: string;
+  spaceNumber: number;
   name?: string;
-  current: boolean;
   visited: boolean;
+  linksToSpaces: number[];
 };

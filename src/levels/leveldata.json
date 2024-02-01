@@ -1,0 +1,61 @@
+{
+    "levels": {
+        "1": {
+            "spaces": [
+                {
+                    "spaceNumber": 1,
+                    "linksToSpaceNumbers": [
+                        2
+                    ],
+                    "hazards": [],
+                    "name": null
+                },
+                {
+                    "spaceNumber": 2,
+                    "linksToSpaceNumbers": [
+                        1,
+                        3
+                    ],
+                    "hazards": [
+                        {
+                            "type": "damage",
+                            "cost": 1
+                        }
+                    ],
+                    "name": null
+                },
+                {
+                    "spaceNumber": 3,
+                    "linksToSpaceNumbers": [
+                        2,
+                        4
+                    ],
+                    "hazards": [],
+                    "name": null
+                },
+                {
+                    "spaceNumber": 4,
+                    "linksToSpaceNumbers": [
+                        3,
+                        5
+                    ],
+                    "hazards": [
+                        {
+                            "type": "damage",
+                            "cost": 1
+                        }
+                    ],
+                    "name": null
+                },
+                {
+                    "spaceNumber": 5,
+                    "linksToSpaceNumbers": [
+                        4
+                    ],
+                    "hazards": [],
+                    "name": "Ocean Floor"
+                }
+            ]
+        }
+    }
+}

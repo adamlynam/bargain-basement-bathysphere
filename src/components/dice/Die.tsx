@@ -2,13 +2,18 @@ import { ReactElement } from "react";
 
 type DieProps = {
   data: DieData;
-  onUseDie: (die: DieData) => void;
+  isSelected: boolean;
+  onSelectDie: (die: DieData) => void;
 };
 
-const Die: React.FC<DieProps> = ({ data, onUseDie }): ReactElement => {
+const Die: React.FC<DieProps> = ({
+  data,
+  isSelected,
+  onSelectDie,
+}): ReactElement => {
   const { value, used } = data;
   const onClickDie = () => {
-    onUseDie(data);
+    onSelectDie(data);
   };
 
   return (
@@ -17,11 +22,18 @@ const Die: React.FC<DieProps> = ({ data, onUseDie }): ReactElement => {
         width: "2em",
         // height: "2em",
         border: "1px solid",
+        borderColor: isSelected ? "blue" : "black",
         textAlign: "center",
       }}
     >
-      <button onClick={onClickDie} disabled={used}>
-        {[...Array(value)].map((value, index) => (
+      <button
+        onClick={onClickDie}
+        disabled={used}
+        style={{
+          color: isSelected ? "blue" : used ? "grey" : "black",
+        }}
+      >
+        {[...Array(value)].map((_dot, index) => (
           <div key={index}>•</div>
         ))}
         [{value}]
