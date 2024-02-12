@@ -24,6 +24,7 @@ const Hazard: React.FC<HazardProps> = ({ data }): ReactElement => {
 export default Hazard;
 
 export type HazardData = {
+  spaceNumber: number | undefined;
   type: HazardType;
   cost: number;
   used: boolean;

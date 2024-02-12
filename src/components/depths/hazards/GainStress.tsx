@@ -6,7 +6,8 @@ type GainStressProps = {
 };
 
 const GainStress: React.FC<GainStressProps> = ({ data }): ReactElement => {
-  return <div>+Bolt</div>;
+  const { used } = data;
+  return <div style={{ color: used ? "grey" : "brown" }}>+Bolt</div>;
 };
 
 export default GainStress;

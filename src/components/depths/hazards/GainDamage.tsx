@@ -6,7 +6,8 @@ type GainDamageProps = {
 };
 
 const GainDamage: React.FC<GainDamageProps> = ({ data }): ReactElement => {
-  return <div>+Fire</div>;
+  const { used } = data;
+  return <div style={{ color: used ? "grey" : "red" }}>+Fire</div>;
 };
 
 export default GainDamage;

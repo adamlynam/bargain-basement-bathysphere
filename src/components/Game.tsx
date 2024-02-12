@@ -29,6 +29,7 @@ const initialHazards: Map<number, HazardData[]> = new Map(
   leveldata.levels[1].spaces.map((space) => [
     space.spaceNumber,
     space.hazards.map((hazard) => ({
+      spaceNumber: space.spaceNumber,
       type: HazardType.GainDamage,
       cost: hazard.cost,
       used: false,
@@ -46,7 +47,8 @@ const Game: React.FC = (): ReactElement => {
   const [maxDamage] = useState<number>(8);
   const [damageGained, setDamageGained] = useState<number>(0);
   const [spaces] = useState<Map<number, SpaceData>>(initialSpaces);
-  const [hazards] = useState<Map<number, HazardData[]>>(initialHazards);
+  const [hazards, setHazards] =
+    useState<Map<number, HazardData[]>>(initialHazards);
   const [dice, setDice] = useState<DieData[]>(rollAvailableDice(availableDice));
   const [selectedDie, setSelectedDie] = useState<DieData | undefined>(
     undefined
@@ -70,6 +72,9 @@ const Game: React.FC = (): ReactElement => {
 
   const moveToNewSpace = (selectedMove: AvailableMove) => {
     setCurrentSpace(selectedMove.spaceNumber);
+    clearHazardsAtNewSpace(selectedMove);
+    experienceHazardsFromMove(selectedMove);
+
     // setSpaces((currentSpaces) => {
     //   const lastSpace = currentSpaces.size - 1;
     //   const newSpaces = Array.from(currentSpaces.values()).map(
@@ -102,17 +107,79 @@ const Game: React.FC = (): ReactElement => {
     // });
   };
 
-  const moveThroughSpace = (space: SpaceData): SpaceData => {
-    const hazardsForSpace = hazards.get(space.spaceNumber);
-    if (hazardsForSpace) {
-      hazardsForSpace.forEach((hazard) => {
-        experienceHazard(hazard);
+  const clearHazardsAtNewSpace = (selectedMove: AvailableMove) => {
+    setHazards((existingHazards) => {
+      return markAllHazardsAtSpaceUsed(
+        selectedMove.spaceNumber,
+        existingHazards
+      );
+    });
+  };
+
+  const markAllHazardsAtSpaceUsed = (
+    spaceToMarkUsed: number,
+    hazards: Map<number, HazardData[]>
+  ) =>
+    updateHazardsAtSpace(
+      spaceToMarkUsed,
+      hazards,
+      (hazards.get(spaceToMarkUsed) || []).map((hazard) => ({
+        ...hazard,
+        used: true,
+      }))
+    );
+
+  const updateHazardsAtSpace = (
+    spaceToUpdateHazardsFor: number,
+    hazards: Map<number, HazardData[]>,
+    newHazards: HazardData[]
+  ) =>
+    new Map(
+      Array.from(hazards.keys()).map((spaceNumber) => [
+        spaceNumber,
+        spaceToUpdateHazardsFor === spaceNumber
+          ? newHazards
+          : hazards.get(spaceNumber) || [],
+      ])
+    );
+
+  const experienceHazardsFromMove = (selectedMove: AvailableMove) => {
+    selectedMove.hazardSpaces.forEach((hazardsInSpace) => {
+      if (hazardsInSpace.length > 0) {
+        experienceHazardsForSpace(
+          hazardsInSpace[0].spaceNumber,
+          hazardsInSpace
+        );
+      }
+    });
+  };
+
+  const experienceHazardsForSpace = (
+    spaceNumberWithHazards: number | undefined,
+    hazards: HazardData[]
+  ) => {
+    const experiencedHazards = hazards.map((hazard) =>
+      experienceHazard(hazard)
+    );
+
+    console.log(spaceNumberWithHazards);
+    // if this is a permanent set of hazards, update the hazard state with the used hazards
+    if (spaceNumberWithHazards != undefined) {
+      setHazards((existingHazards) => {
+        return updateHazardsAtSpace(
+          spaceNumberWithHazards,
+          existingHazards,
+          experiencedHazards
+        );
       });
     }
-    return space;
   };
 
   const experienceHazard = (hazard: HazardData): HazardData => {
+    if (hazard.used) {
+      return hazard; // return the hazard without any effect if it has already been used
+    }
+
     switch (hazard.type) {
       case HazardType.LoseOxygen:
         consumeOxygen(hazard.cost);
@@ -164,7 +231,8 @@ const Game: React.FC = (): ReactElement => {
         availableMoves={calculateAvailableMoves(
           currentSpace,
           selectedDie,
-          spaces
+          spaces,
+          hazards
         )}
         onSelectMove={onSelectMove}
       />
@@ -193,28 +261,38 @@ const rollAvailableDice = (availableDice: number): DieData[] => {
 const calculateAvailableMoves = (
   currentSpace: number,
   selectedDie: DieData | undefined,
-  spaces: Map<number, SpaceData>
+  spaces: Map<number, SpaceData>,
+  hazards: Map<number, HazardData[]>
 ): AvailableMove[] => {
   if (selectedDie === undefined) {
     return [];
   }
 
-  return calculateMovesFromSpace(currentSpace, selectedDie.value, spaces, []);
+  return calculateMovesFromSpace(
+    currentSpace,
+    selectedDie.value,
+    spaces,
+    hazards,
+    [], // no spaces visited yet
+    [] // no hazards encountered yet
+  );
 };
 
 const calculateMovesFromSpace = (
-  fromSpace: number,
+  currentSpace: number,
   movementRemaining: number,
   spaces: Map<number, SpaceData>,
-  vistedSpaces: number[]
+  hazards: Map<number, HazardData[]>,
+  vistedSpaces: number[],
+  hazardsEncountered: HazardData[][]
 ): AvailableMove[] => {
   if (movementRemaining === 0) {
-    return [{ spaceNumber: fromSpace }];
+    return [{ spaceNumber: currentSpace, hazardSpaces: hazardsEncountered }];
   }
 
-  const consideringSpace = spaces.get(fromSpace);
+  const consideringSpace = spaces.get(currentSpace);
   if (consideringSpace === undefined) {
-    return [];
+    return []; // the current space cannot be found, so we cannot return any moves
   }
 
   const availableSpaces = consideringSpace.linksToSpaces.filter(
@@ -222,15 +300,31 @@ const calculateMovesFromSpace = (
   );
 
   if (availableSpaces.length < 1) {
-    // TODO: add stress here to match remaining movement
-    return [{ spaceNumber: fromSpace }];
+    const stressFromMovingTooFar: HazardData = {
+      spaceNumber: undefined,
+      type: HazardType.GainStress,
+      cost: movementRemaining,
+      used: false,
+    };
+    return [
+      {
+        spaceNumber: currentSpace,
+        hazardSpaces: [...hazardsEncountered, [stressFromMovingTooFar]],
+      },
+    ];
   }
 
+  const hazardsInCurrentSpace = hazards.get(currentSpace) || [];
+
   return availableSpaces.flatMap((availableSpace) =>
-    calculateMovesFromSpace(availableSpace, movementRemaining - 1, spaces, [
-      ...vistedSpaces,
-      fromSpace,
-    ])
+    calculateMovesFromSpace(
+      availableSpace,
+      movementRemaining - 1,
+      spaces,
+      hazards,
+      [...vistedSpaces, currentSpace],
+      [...hazardsEncountered, hazardsInCurrentSpace]
+    )
   );
 };
 
@@ -238,4 +332,5 @@ export default Game;
 
 export type AvailableMove = {
   spaceNumber: number;
+  hazardSpaces: HazardData[][];
 };

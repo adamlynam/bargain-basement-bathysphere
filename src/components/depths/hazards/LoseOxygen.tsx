@@ -6,7 +6,8 @@ type LoseOxygenProps = {
 };
 
 const LoseOxygen: React.FC<LoseOxygenProps> = ({ data }): ReactElement => {
-  return <div>-O2</div>;
+  const { used } = data;
+  return <div style={{ color: used ? "grey" : "blue" }}>-O2</div>;
 };
 
 export default LoseOxygen;
