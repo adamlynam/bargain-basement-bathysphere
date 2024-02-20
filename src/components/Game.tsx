@@ -11,31 +11,35 @@ import { HazardData } from "./depths/hazards/Hazard";
 
 import leveldata from "../levels/leveldata.json";
 
-const initialSpaces: Map<number, SpaceData> = new Map(
-  leveldata.levels[1].spaces.map((value) => {
-    return [
-      value.spaceNumber,
-      {
-        spaceNumber: value.spaceNumber,
-        name: value.name ? value.name : undefined,
-        visited: value.spaceNumber === 1 ? true : false,
-        linksToSpaces: value.linksToSpaceNumbers,
-      },
-    ];
-  })
-);
+const loadLevelSpaces = (level: "1"): Map<number, SpaceData> => {
+  return new Map(
+    leveldata.levels[level].spaces.map((value) => {
+      return [
+        value.spaceNumber,
+        {
+          spaceNumber: value.spaceNumber,
+          name: value.name ? value.name : undefined,
+          visited: value.spaceNumber === 1 ? true : false,
+          linksToSpaces: value.linksToSpaceNumbers,
+        },
+      ];
+    })
+  );
+};
 
-const initialHazards: Map<number, HazardData[]> = new Map(
-  leveldata.levels[1].spaces.map((space) => [
-    space.spaceNumber,
-    space.hazards.map((hazard) => ({
-      spaceNumber: space.spaceNumber,
-      type: HazardType.GainDamage,
-      cost: hazard.cost,
-      used: false,
-    })),
-  ])
-);
+const loadLevelHazards = (level: "1"): Map<number, HazardData[]> => {
+  return new Map(
+    leveldata.levels[level].spaces.map((space) => [
+      space.spaceNumber,
+      space.hazards.map((hazard) => ({
+        spaceNumber: space.spaceNumber,
+        type: HazardType.GainDamage,
+        cost: hazard.cost,
+        used: false,
+      })),
+    ])
+  );
+};
 
 const Game: React.FC = (): ReactElement => {
   const [currentSpace, setCurrentSpace] = useState<number>(1);
@@ -46,9 +50,11 @@ const Game: React.FC = (): ReactElement => {
   const [stressGained, setStressGained] = useState<number>(0);
   const [maxDamage] = useState<number>(8);
   const [damageGained, setDamageGained] = useState<number>(0);
-  const [spaces] = useState<Map<number, SpaceData>>(initialSpaces);
-  const [hazards, setHazards] =
-    useState<Map<number, HazardData[]>>(initialHazards);
+  const [spaces] = useState<Map<number, SpaceData>>(loadLevelSpaces("1"));
+  const [visitedSpaces, setVisitedSpaces] = useState<number[]>([1]);
+  const [hazards, setHazards] = useState<Map<number, HazardData[]>>(
+    loadLevelHazards("1")
+  );
   const [dice, setDice] = useState<DieData[]>(rollAvailableDice(availableDice));
   const [selectedDie, setSelectedDie] = useState<DieData | undefined>(
     undefined
@@ -72,39 +78,12 @@ const Game: React.FC = (): ReactElement => {
 
   const moveToNewSpace = (selectedMove: AvailableMove) => {
     setCurrentSpace(selectedMove.spaceNumber);
+    setVisitedSpaces((visitedSpaces) => [
+      ...visitedSpaces,
+      selectedMove.spaceNumber,
+    ]);
     clearHazardsAtNewSpace(selectedMove);
     experienceHazardsFromMove(selectedMove);
-
-    // setSpaces((currentSpaces) => {
-    //   const lastSpace = currentSpaces.size - 1;
-    //   const newSpaces = Array.from(currentSpaces.values()).map(
-    //     (space, index) => {
-    //       if (index < leavingSpace || index > targetSpace) {
-    //         return space; // not in our movement range
-    //       } else if (index === leavingSpace && index < lastSpace) {
-    //         return { ...space, current: false, visited: true }; // only unset current space if there is a next space to move to
-    //       } else if (
-    //         index > leavingSpace &&
-    //         index < targetSpace &&
-    //         index !== lastSpace
-    //       ) {
-    //         return moveThroughSpace(space);
-    //       } else if (index === targetSpace) {
-    //         setCurrentSpace(targetSpace);
-    //         return { ...space, current: true, visited: true };
-    //       } else if (index === lastSpace) {
-    //         setCurrentSpace(lastSpace);
-    //         takeStress(targetSpace - lastSpace); // difference between last space and movement
-    //         return { ...space, current: true, visited: true };
-    //       }
-
-    //       return space;
-    //     }
-    //   );
-    //   return new Map(
-    //     newSpaces.map((newSpace) => [newSpace.spaceNumber, newSpace])
-    //   );
-    // });
   };
 
   const clearHazardsAtNewSpace = (selectedMove: AvailableMove) => {
@@ -228,11 +207,13 @@ const Game: React.FC = (): ReactElement => {
         spaces={spaces}
         hazards={hazards}
         currentSpace={currentSpace}
+        visitedSpaces={visitedSpaces}
         availableMoves={calculateAvailableMoves(
           currentSpace,
           selectedDie,
           spaces,
-          hazards
+          hazards,
+          visitedSpaces
         )}
         onSelectMove={onSelectMove}
       />
@@ -262,7 +243,8 @@ const calculateAvailableMoves = (
   currentSpace: number,
   selectedDie: DieData | undefined,
   spaces: Map<number, SpaceData>,
-  hazards: Map<number, HazardData[]>
+  hazards: Map<number, HazardData[]>,
+  visitedSpaces: number[]
 ): AvailableMove[] => {
   if (selectedDie === undefined) {
     return [];
@@ -273,7 +255,8 @@ const calculateAvailableMoves = (
     selectedDie.value,
     spaces,
     hazards,
-    [], // no spaces visited yet
+    visitedSpaces,
+    [], // no spaces considered yet
     [] // no hazards encountered yet
   );
 };
@@ -283,11 +266,33 @@ const calculateMovesFromSpace = (
   movementRemaining: number,
   spaces: Map<number, SpaceData>,
   hazards: Map<number, HazardData[]>,
-  vistedSpaces: number[],
+  visitedSpaces: number[],
+  consideredSpaces: number[],
   hazardsEncountered: HazardData[][]
 ): AvailableMove[] => {
   if (movementRemaining === 0) {
-    return [{ spaceNumber: currentSpace, hazardSpaces: hazardsEncountered }];
+    // if we have visited this space before
+    if (visitedSpaces.includes(currentSpace)) {
+      const stressFromVisitingSameSpaceAgain: HazardData = {
+        spaceNumber: undefined,
+        type: HazardType.GainStress,
+        cost: 1,
+        used: false,
+      };
+      return [
+        {
+          spaceNumber: currentSpace,
+          hazardSpaces: [
+            ...hazardsEncountered,
+            [stressFromVisitingSameSpaceAgain],
+          ],
+        },
+      ];
+    }
+    // if we have never visited this space
+    else {
+      return [{ spaceNumber: currentSpace, hazardSpaces: hazardsEncountered }];
+    }
   }
 
   const consideringSpace = spaces.get(currentSpace);
@@ -296,7 +301,7 @@ const calculateMovesFromSpace = (
   }
 
   const availableSpaces = consideringSpace.linksToSpaces.filter(
-    (linkedSpace) => !vistedSpaces.includes(linkedSpace)
+    (linkedSpace) => !consideredSpaces.includes(linkedSpace)
   );
 
   if (availableSpaces.length < 1) {
@@ -322,7 +327,8 @@ const calculateMovesFromSpace = (
       movementRemaining - 1,
       spaces,
       hazards,
-      [...vistedSpaces, currentSpace],
+      visitedSpaces,
+      [...consideredSpaces, currentSpace],
       [...hazardsEncountered, hazardsInCurrentSpace]
     )
   );

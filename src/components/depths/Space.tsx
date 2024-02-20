@@ -5,6 +5,7 @@ import { AvailableMove } from "../Game";
 type SpaceProps = {
   space: SpaceData;
   hazards: HazardData[];
+  isVisited: boolean;
   isCurrentSpace: boolean;
   availableMove: AvailableMove | undefined;
   onSelectMove: (selectedMove: AvailableMove) => void;
@@ -13,11 +14,12 @@ type SpaceProps = {
 const Space: React.FC<SpaceProps> = ({
   space,
   hazards,
+  isVisited,
   isCurrentSpace,
   availableMove,
   onSelectMove,
 }): ReactElement => {
-  const { name, visited } = space;
+  const { name } = space;
   return (
     <div
       onClick={() => {
@@ -28,7 +30,7 @@ const Space: React.FC<SpaceProps> = ({
       style={{
         padding: "1em",
         border: availableMove ? "3px solid blue" : "1px solid black",
-        backgroundColor: isCurrentSpace ? "pink" : visited ? "grey" : "white",
+        backgroundColor: isCurrentSpace ? "pink" : isVisited ? "grey" : "white",
         cursor: availableMove ? "pointer" : "default",
       }}
     >
@@ -45,6 +47,5 @@ export default Space;
 export type SpaceData = {
   spaceNumber: number;
   name?: string;
-  visited: boolean;
   linksToSpaces: number[];
 };

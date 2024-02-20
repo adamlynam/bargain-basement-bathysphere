@@ -7,6 +7,7 @@ type DepthsProps = {
   spaces: Map<number, SpaceData>;
   hazards: Map<number, HazardData[]>;
   currentSpace: number;
+  visitedSpaces: number[];
   availableMoves: AvailableMove[];
   onSelectMove: (selectedMove: AvailableMove) => void;
 };
@@ -15,6 +16,7 @@ function Depths({
   spaces,
   hazards,
   currentSpace,
+  visitedSpaces,
   availableMoves,
   onSelectMove,
 }: DepthsProps) {
@@ -28,6 +30,7 @@ function Depths({
             space={space}
             hazards={hazardsForSpace ? hazardsForSpace : []}
             isCurrentSpace={space.spaceNumber === currentSpace}
+            isVisited={visitedSpaces.includes(space.spaceNumber)}
             availableMove={availableMoves.find(
               (availableMove) => availableMove.spaceNumber === space.spaceNumber
             )}
